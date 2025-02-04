@@ -7,6 +7,75 @@
 
 import SwiftUI
 
+// MARK: - Network Manager
+@Observable final class NetworkManager {
+    // Debug log
+    static let shared = NetworkManager()
+    
+    func likeProperty(uid: String, listingId: String) async throws -> Bool {
+        // Debug log
+        print("Liking property: \(listingId) for user: \(uid)")
+        
+        // TODO: Replace with actual API endpoint
+        let url = URL(string: "https://api.example.com/like")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = [
+            "uid": uid,
+            "listingId": listingId
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        // Simulate API call for now
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        return true
+    }
+    
+    func favoriteProperty(uid: String, listingId: String) async throws -> Bool {
+        // Debug log
+        print("Favoriting property: \(listingId) for user: \(uid)")
+        
+        // TODO: Replace with actual API endpoint
+        let url = URL(string: "https://api.example.com/favorite")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = [
+            "uid": uid,
+            "listingId": listingId
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        // Simulate API call for now
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        return true
+    }
+    
+    func unfavoriteProperty(uid: String, listingId: String) async throws -> Bool {
+        // Debug log
+        print("Unfavoriting property: \(listingId) for user: \(uid)")
+        
+        // TODO: Replace with actual API endpoint
+        let url = URL(string: "https://api.example.com/favorite")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = [
+            "uid": uid,
+            "listingId": listingId
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        // Simulate API call for now
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        return true
+    }
+}
+
 // MARK: - Property Model
 struct Property: Identifiable {
     let id: String
@@ -23,12 +92,14 @@ struct Property: Identifiable {
     let listingDate: Date
     let agent: Agent
     var likeCount: Int
+    var isFavorited: Bool
     
     // Debug log
     func logPropertyDetails() {
         print("Loading property: \(id)")
         print("Address: \(address.street), \(address.city)")
         print("Price: $\(price)")
+        print("Favorited: \(isFavorited)")
     }
 }
 
@@ -48,6 +119,8 @@ struct Agent {
 @Observable final class PropertyViewModel {
     private(set) var properties: [Property] = []
     private(set) var currentIndex: Int = 0
+    private(set) var isLiking = false
+    private(set) var isFavoriting = false
     
     // Debug log
     func loadProperties() {
@@ -68,7 +141,8 @@ struct Agent {
                 status: "Active",
                 listingDate: Date(),
                 agent: Agent(name: "Jane Smith", brokerage: "ABC Realty"),
-                likeCount: 0
+                likeCount: 0,
+                isFavorited: false
             )
         ]
     }
@@ -76,6 +150,76 @@ struct Agent {
     var currentProperty: Property? {
         guard !properties.isEmpty else { return nil }
         return properties[currentIndex]
+    }
+    
+    // Like functionality
+    @MainActor
+    func likeProperty() async {
+        guard let property = currentProperty else { return }
+        guard !isLiking else { return }
+        
+        // Debug log
+        print("Attempting to like property: \(property.id)")
+        
+        isLiking = true
+        defer { isLiking = false }
+        
+        do {
+            // TODO: Get actual user ID from authentication
+            let uid = "user123"
+            let success = try await NetworkManager.shared.likeProperty(uid: uid, listingId: property.id)
+            
+            if success {
+                // Update local state
+                if let index = properties.firstIndex(where: { $0.id == property.id }) {
+                    properties[index].likeCount += 1
+                    // Debug log
+                    print("Successfully liked property. New like count: \(properties[index].likeCount)")
+                }
+            }
+        } catch {
+            // Debug log
+            print("Error liking property: \(error.localizedDescription)")
+            // TODO: Show error to user
+        }
+    }
+    
+    // Favorite functionality
+    @MainActor
+    func toggleFavorite() async {
+        guard let property = currentProperty else { return }
+        guard !isFavoriting else { return }
+        
+        // Debug log
+        print("Attempting to toggle favorite for property: \(property.id)")
+        
+        isFavoriting = true
+        defer { isFavoriting = false }
+        
+        do {
+            // TODO: Get actual user ID from authentication
+            let uid = "user123"
+            let success: Bool
+            
+            if property.isFavorited {
+                success = try await NetworkManager.shared.unfavoriteProperty(uid: uid, listingId: property.id)
+            } else {
+                success = try await NetworkManager.shared.favoriteProperty(uid: uid, listingId: property.id)
+            }
+            
+            if success {
+                // Update local state
+                if let index = properties.firstIndex(where: { $0.id == property.id }) {
+                    properties[index].isFavorited.toggle()
+                    // Debug log
+                    print("Successfully \(properties[index].isFavorited ? "favorited" : "unfavorited") property")
+                }
+            }
+        } catch {
+            // Debug log
+            print("Error toggling favorite: \(error.localizedDescription)")
+            // TODO: Show error to user
+        }
     }
 }
 
@@ -216,13 +360,26 @@ struct VideoFeedView: View {
                             
                             // Action Buttons
                             VStack(spacing: 20) {
-                                ActionButton(icon: "heart.fill", count: "\(property.likeCount)", isActive: isLiked) {
+                                ActionButton(
+                                    icon: "heart.fill",
+                                    count: "\(property.likeCount)",
+                                    isActive: isLiked
+                                ) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                         isLiked.toggle()
+                                        Task {
+                                            await model.likeProperty()
+                                        }
                                     }
                                 }
-                                ActionButton(icon: "message.fill", count: "Info") {
-                                    showPropertyDetails.toggle()
+                                ActionButton(
+                                    icon: "bookmark.fill",
+                                    count: "Save",
+                                    isActive: property.isFavorited
+                                ) {
+                                    Task {
+                                        await model.toggleFavorite()
+                                    }
                                 }
                                 ActionButton(icon: "square.and.arrow.up", count: "Share")
                             }
