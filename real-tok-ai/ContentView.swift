@@ -75,6 +75,40 @@ import UIKit
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         return true
     }
+    
+    func getFavorites(uid: String) async throws -> [Property] {
+        // Debug log
+        print("Fetching favorites for user: \(uid)")
+        
+        // TODO: Replace with actual API endpoint
+        let url = URL(string: "https://api.example.com/favorites/\(uid)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        // Simulate API call for now
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Return mock data
+        return [
+            Property(
+                id: "TX-123456",
+                address: Address(street: "123 Elm St", city: "Austin", state: "TX", zip: "78701"),
+                price: 500000,
+                propertyType: "Single Family Home",
+                bedrooms: 4,
+                bathrooms: 3,
+                squareFeet: 2500,
+                description: "Beautiful updated home in downtown Austin with a modern kitchen and spacious backyard.",
+                features: ["Modern Kitchen", "Spacious Backyard", "Swimming Pool"],
+                photos: ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750"],
+                status: "Active",
+                listingDate: Date(),
+                agent: Agent(name: "Jane Smith", brokerage: "ABC Realty"),
+                likeCount: 0,
+                isFavorited: true
+            )
+        ]
+    }
 }
 
 // MARK: - Property Model
@@ -316,6 +350,250 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - Favorites View Model
+@Observable final class FavoritesViewModel {
+    private(set) var favorites: [Property] = []
+    private(set) var isLoading = false
+    private(set) var error: Error?
+    private(set) var isFavoriting = false
+    
+    @MainActor
+    func loadFavorites() async {
+        guard !isLoading else { return }
+        
+        // Debug log
+        print("Loading favorites...")
+        
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            // TODO: Get actual user ID from authentication
+            let uid = "user123"
+            favorites = try await NetworkManager.shared.getFavorites(uid: uid)
+            
+            // Debug log
+            print("Successfully loaded \(favorites.count) favorites")
+        } catch {
+            self.error = error
+            // Debug log
+            print("Error loading favorites: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    func unfavoriteProperty(_ property: Property) async {
+        guard !isFavoriting else { return }
+        
+        // Debug log
+        print("Attempting to unfavorite property: \(property.id)")
+        
+        isFavoriting = true
+        defer { isFavoriting = false }
+        
+        do {
+            // TODO: Get actual user ID from authentication
+            let uid = "user123"
+            let success = try await NetworkManager.shared.unfavoriteProperty(uid: uid, listingId: property.id)
+            
+            if success {
+                // Remove from local state
+                favorites.removeAll { $0.id == property.id }
+                // Debug log
+                print("Successfully unfavorited property and removed from list")
+            }
+        } catch {
+            // Debug log
+            print("Error unfavoriting property: \(error.localizedDescription)")
+            // TODO: Show error to user
+        }
+    }
+}
+
+// MARK: - Favorites View
+struct FavoritesView: View {
+    let model: FavoritesViewModel
+    @State private var selectedProperty: Property?
+    @State private var showPropertyDetails = false
+    
+    init() {
+        self.model = FavoritesViewModel()
+    }
+    
+    var body: some View {
+        NavigationView {
+            Group {
+                if model.isLoading {
+                    ProgressView("Loading favorites...")
+                        .scaleEffect(1.5)
+                } else if let error = model.error {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.yellow)
+                        Text("Error loading favorites")
+                            .font(.headline)
+                        Text(error.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                        Button("Try Again") {
+                            // Debug log
+                            print("Retrying favorites load")
+                            Task {
+                                await model.loadFavorites()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding()
+                } else if model.favorites.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "heart.slash")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray)
+                        Text("No Favorites Yet")
+                            .font(.headline)
+                        Text("Properties you favorite will appear here")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                } else {
+                    ScrollView {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 16),
+                                GridItem(.flexible(), spacing: 16)
+                            ],
+                            spacing: 16
+                        ) {
+                            ForEach(model.favorites) { property in
+                                PropertyCard(property: property) {
+                                    // Debug log
+                                    print("Unfavorite confirmed for property: \(property.id)")
+                                    Task {
+                                        await model.unfavoriteProperty(property)
+                                    }
+                                }
+                                .onTapGesture {
+                                    selectedProperty = property
+                                    showPropertyDetails = true
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top)
+                    }
+                }
+            }
+            .navigationTitle("Favorites")
+        }
+        .sheet(isPresented: $showPropertyDetails) {
+            if let property = selectedProperty {
+                PropertyDetailsOverlay(property: property, isPresented: $showPropertyDetails)
+            }
+        }
+        .onAppear {
+            // Debug log
+            print("FavoritesView appeared")
+            Task {
+                await model.loadFavorites()
+            }
+        }
+    }
+}
+
+// MARK: - Property Card
+struct PropertyCard: View {
+    let property: Property
+    var onUnfavorite: (() -> Void)?
+    @State private var showUnfavoriteConfirmation = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Property Image with Unfavorite Button Overlay
+            ZStack(alignment: .topTrailing) {
+                AsyncImage(url: URL(string: property.photos[0])) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 160)
+                            .clipped()
+                    case .failure:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 160)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.gray)
+                            )
+                    case .empty:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 160)
+                            .overlay(
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                            )
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                
+                if onUnfavorite != nil {
+                    Button {
+                        // Debug log
+                        print("Unfavorite button tapped for property: \(property.id)")
+                        showUnfavoriteConfirmation = true
+                    } label: {
+                        Image(systemName: "heart.fill")
+                            .font(.title3)
+                            .foregroundColor(.red)
+                            .padding(8)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                    }
+                    .padding(8)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .cornerRadius(12)
+            
+            // Property Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(property.address.street)
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                Text("\(property.bedrooms) bed • \(property.bathrooms) bath")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                
+                Text("$\(Int(property.price))")
+                    .font(.title3)
+                    .fontWeight(.bold)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+        .alert("Remove from Favorites?", isPresented: $showUnfavoriteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                onUnfavorite?()
+            }
+        } message: {
+            Text("This property will be removed from your favorites list.")
+        }
+    }
+}
+
 // MARK: - Main Content View
 struct ContentView: View {
     // Following Rule: Use @State only for local state managed by view itself
@@ -331,25 +609,26 @@ struct ContentView: View {
                 }
                 .tag(0)
             
+            // Favorites View
+            FavoritesView()
+                .tabItem {
+                    Image(systemName: "heart.fill")
+                    Text("Favorites")
+                }
+                .tag(1)
+            
             // Placeholder tabs for complete UI
             Text("Discover")
                 .tabItem {
                     Image(systemName: "magnifyingglass")
                     Text("Discover")
                 }
-                .tag(1)
+                .tag(2)
             
             Text("Create")
                 .tabItem {
                     Image(systemName: "plus.square")
                     Text("Create")
-                }
-                .tag(2)
-            
-            Text("Inbox")
-                .tabItem {
-                    Image(systemName: "message.fill")
-                    Text("Inbox")
                 }
                 .tag(3)
             
