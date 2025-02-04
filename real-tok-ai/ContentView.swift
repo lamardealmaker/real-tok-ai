@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Network Manager
 @Observable final class NetworkManager {
@@ -115,12 +116,63 @@ struct Agent {
     let brokerage: String
 }
 
+// MARK: - Share Sheet Helper
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    // Debug log
+    init(items: [Any]) {
+        print("Initializing ShareSheet with \(items.count) items")
+        self.items = items
+    }
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        // Debug log
+        print("Creating UIActivityViewController")
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        
+        // Exclude certain activity types that might cause issues
+        controller.excludedActivityTypes = [
+            .addToReadingList,
+            .assignToContact,
+            .openInIBooks,
+            .saveToCameraRoll // Since we're handling images as URLs
+        ]
+        
+        // Handle iPad presentation
+        if let popoverController = controller.popoverPresentationController {
+            popoverController.permittedArrowDirections = []
+            popoverController.sourceView = UIView() // Empty view
+            popoverController.sourceRect = CGRect(x: 0, y: 0, width: 0, height: 0)
+        }
+        
+        // Add completion handler for debugging
+        controller.completionWithItemsHandler = { (activityType, completed, returnedItems, error) in
+            if let error = error {
+                print("Share error: \(error.localizedDescription)")
+                return
+            }
+            
+            if completed {
+                print("Share completed via \(activityType?.rawValue ?? "unknown")")
+            } else {
+                print("Share cancelled")
+            }
+        }
+        
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 // MARK: - Property View Model
 @Observable final class PropertyViewModel {
     private(set) var properties: [Property] = []
     private(set) var currentIndex: Int = 0
     private(set) var isLiking = false
     private(set) var isFavoriting = false
+    private(set) var isShowingShareSheet = false
     
     // Debug log
     func loadProperties() {
@@ -220,6 +272,47 @@ struct Agent {
             print("Error toggling favorite: \(error.localizedDescription)")
             // TODO: Show error to user
         }
+    }
+    
+    // Share functionality
+    func getShareItems(for property: Property) -> [Any] {
+        // Debug log
+        print("Preparing share items for property: \(property.id)")
+        
+        var items: [Any] = []
+        
+        // Add property details
+        let priceFormatter = NumberFormatter()
+        priceFormatter.numberStyle = .currency
+        priceFormatter.locale = Locale(identifier: "en_US")
+        
+        let price = priceFormatter.string(from: NSNumber(value: property.price)) ?? "$\(property.price)"
+        let description = """
+        🏠 Check out this amazing property!
+        
+        📍 \(property.address.street)
+        🏘️ \(property.address.city), \(property.address.state) \(property.address.zip)
+        💰 \(price)
+        🛏️ \(property.bedrooms) beds | 🚿 \(property.bathrooms) baths
+        📐 \(property.squareFeet) sq ft
+        
+        Powered by Real Tok AI
+        """
+        
+        items.append(description)
+        
+        // Add first photo if available
+        if let url = URL(string: property.photos[0]) {
+            items.append(url)
+        }
+        
+        return items
+    }
+    
+    func toggleShareSheet() {
+        // Debug log
+        print("Toggling share sheet. Current state: \(isShowingShareSheet)")
+        isShowingShareSheet.toggle()
     }
 }
 
@@ -381,7 +474,14 @@ struct VideoFeedView: View {
                                         await model.toggleFavorite()
                                     }
                                 }
-                                ActionButton(icon: "square.and.arrow.up", count: "Share")
+                                ActionButton(
+                                    icon: "square.and.arrow.up",
+                                    count: "Share"
+                                ) {
+                                    // Debug log
+                                    print("Share button tapped")
+                                    model.toggleShareSheet()
+                                }
                             }
                             .padding(.trailing, 16)
                             .padding(.bottom, 100)
@@ -400,6 +500,14 @@ struct VideoFeedView: View {
             // Debug log
             print("VideoFeedView appeared")
             model.loadProperties()
+        }
+        .sheet(isPresented: .init(
+            get: { model.isShowingShareSheet },
+            set: { _ in model.toggleShareSheet() }
+        )) {
+            if let property = model.currentProperty {
+                ShareSheet(items: model.getShareItems(for: property))
+            }
         }
     }
 }
@@ -428,9 +536,12 @@ struct PropertyDetailsOverlay: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     Spacer()
-                    Button(action: { isPresented = false }) {
+                    Button {
+                        isPresented = false
+                    } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
+                            .foregroundColor(.primary)
                     }
                 }
                 
