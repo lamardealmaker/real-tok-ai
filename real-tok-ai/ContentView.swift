@@ -7,6 +7,8 @@
 
 import SwiftUI
 import UIKit
+import FirebaseFirestore
+import RealTokCore
 
 // MARK: - Network Manager
 @Observable final class NetworkManager {
@@ -416,8 +418,8 @@ struct FavoritesView: View {
     @State private var selectedProperty: Property?
     @State private var showPropertyDetails = false
     
-    init() {
-        self.model = FavoritesViewModel()
+    init(model: FavoritesViewModel) {
+        self.model = model
     }
     
     var body: some View {
@@ -596,51 +598,39 @@ struct PropertyCard: View {
 
 // MARK: - Main Content View
 struct ContentView: View {
-    // Following Rule: Use @State only for local state managed by view itself
-    @State private var selectedTab = 0
+    // Debug log helper
+    private static func log(_ message: String) {
+        print("[ContentView] \(message)")
+    }
     
+    // MARK: - Properties
+    @State private var model = PropertyViewModel()
+    @State private var userId = "test_user" // TODO: Replace with actual user ID from Firebase Auth
+    
+    // MARK: - Body
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Main Feed View
-            VideoFeedView()
+        TabView {
+            // Video Feed
+            VideoFeedView(model: model, userId: userId)
                 .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Home")
+                    Label("Feed", systemImage: "play.rectangle")
                 }
-                .tag(0)
             
-            // Favorites View
-            FavoritesView()
+            // Favorites
+            FavoritesView(model: model, userId: userId)
                 .tabItem {
-                    Image(systemName: "heart.fill")
-                    Text("Favorites")
+                    Label("Favorites", systemImage: "bookmark")
                 }
-                .tag(1)
             
-            // Placeholder tabs for complete UI
-            Text("Discover")
+            // Profile
+            ProfileView(userId: userId)
                 .tabItem {
-                    Image(systemName: "magnifyingglass")
-                    Text("Discover")
+                    Label("Profile", systemImage: "person")
                 }
-                .tag(2)
-            
-            Text("Create")
-                .tabItem {
-                    Image(systemName: "plus.square")
-                    Text("Create")
-                }
-                .tag(3)
-            
-            Text("Profile")
-                .tabItem {
-                    Image(systemName: "person.fill")
-                    Text("Profile")
-                }
-                .tag(4)
         }
-        .accentColor(.white)
-        .preferredColorScheme(.dark)
+        .onAppear {
+            ContentView.log("ContentView appeared")
+        }
     }
 }
 
@@ -649,9 +639,11 @@ struct VideoFeedView: View {
     @State private var isLiked = false
     @State private var showPropertyDetails = false
     let model: PropertyViewModel
+    let userId: String
     
-    init() {
-        self.model = PropertyViewModel()
+    init(model: PropertyViewModel, userId: String) {
+        self.model = model
+        self.userId = userId
     }
     
     var body: some View {

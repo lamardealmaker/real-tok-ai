@@ -1,0 +1,11 @@
+listingId,address,city,state,zipCode,price,propertyType,bedrooms,bathrooms,squareFeet,description,features,yearBuilt,status,photoUrls
+TX-123456,123 Elm St,Austin,TX,78701,500000,Single Family Home,4,3,2500,"Beautiful updated home with modern finishes","Updated Kitchen, Hardwood Floors, Large Backyard",1985,For Sale,""
+TX-123457,456 Oak Ave,Austin,TX,78702,750000,Single Family Home,5,4.5,3200,"Stunning modern home in prime location","Pool, Smart Home Features, Gourmet Kitchen",2010,For Sale,""
+TX-123458,789 Pine Ln,Austin,TX,78703,1200000,Luxury Home,6,5.5,4500,"Luxurious estate with amazing views","Wine Cellar, Home Theater, Guest House",2015,For Sale,""
+TX-123459,321 Maple Dr,Austin,TX,78704,400000,Condo,2,2,1200,"Modern condo in downtown","Balcony, Gym Access, Secured Parking",2018,For Sale,""
+TX-123460,654 Cedar Rd,Austin,TX,78705,600000,Townhouse,3,2.5,1800,"Spacious townhome near UT Austin","Rooftop Deck, Study Room, Garage",2012,For Sale,""
+TX-123461,987 Birch Ct,Austin,TX,78731,850000,Single Family Home,4,3.5,3000,"Charming home in great neighborhood","Garden, Sunroom, Updated Bathrooms",1995,For Sale,""
+TX-123462,147 Willow Way,Austin,TX,78746,950000,Single Family Home,5,4,3500,"Elegant home with pool","Pool, Outdoor Kitchen, Media Room",2008,For Sale,""
+TX-123463,258 Spruce St,Austin,TX,78748,450000,Single Family Home,3,2,1900,"Perfect starter home","Fenced Yard, New Appliances, Open Concept",2000,For Sale,""
+TX-123464,369 Ash Ln,Austin,TX,78749,700000,Single Family Home,4,3,2800,"Beautiful family home","Game Room, Office, Large Kitchen",2005,For Sale,""
+TX-123465,159 Palm Dr,Austin,TX,78750,1500000,Luxury Home,6,6,5000,"Stunning luxury estate","Pool, Tennis Court, Guest Suite",2020,For Sale,""
