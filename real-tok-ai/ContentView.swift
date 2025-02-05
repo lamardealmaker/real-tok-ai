@@ -1,12 +1,7 @@
-//
-//  ContentView.swift
-//  real-tok-ai
-//
-//  Created by Learn on 3/02/25.
-//
-
 import SwiftUI
 import UIKit
+import AVKit
+import FirebaseCore
 
 // MARK: - Network Manager
 @Observable final class NetworkManager {
@@ -101,6 +96,7 @@ import UIKit
                 description: "Beautiful updated home in downtown Austin with a modern kitchen and spacious backyard.",
                 features: ["Modern Kitchen", "Spacious Backyard", "Swimming Pool"],
                 photos: ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750"],
+                videoURL: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
                 status: "Active",
                 listingDate: Date(),
                 agent: Agent(name: "Jane Smith", brokerage: "ABC Realty"),
@@ -123,6 +119,7 @@ struct Property: Identifiable {
     let description: String
     let features: [String]
     let photos: [String]
+    let videoURL: String
     let status: String
     let listingDate: Date
     let agent: Agent
@@ -170,7 +167,7 @@ struct ShareSheet: UIViewControllerRepresentable {
             .addToReadingList,
             .assignToContact,
             .openInIBooks,
-            .saveToCameraRoll // Since we're handling images as URLs
+            .saveToCameraRoll
         ]
         
         // Handle iPad presentation
@@ -203,15 +200,11 @@ struct ShareSheet: UIViewControllerRepresentable {
 // MARK: - Property View Model
 @Observable final class PropertyViewModel {
     private(set) var properties: [Property] = []
-    private(set) var currentIndex: Int = 0
-    private(set) var isLiking = false
-    private(set) var isFavoriting = false
     private(set) var isShowingShareSheet = false
-    
     // Debug log
     func loadProperties() {
         print("Loading properties from backend...")
-        // TODO: Implement actual API call
+        // Simulate loading three dummy properties with video URLs
         properties = [
             Property(
                 id: "TX-123456",
@@ -224,102 +217,93 @@ struct ShareSheet: UIViewControllerRepresentable {
                 description: "Beautiful updated home in downtown Austin with a modern kitchen and spacious backyard.",
                 features: ["Modern Kitchen", "Spacious Backyard", "Swimming Pool"],
                 photos: ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750"],
+                videoURL: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
                 status: "Active",
                 listingDate: Date(),
                 agent: Agent(name: "Jane Smith", brokerage: "ABC Realty"),
+                likeCount: 0,
+                isFavorited: false
+            ),
+            Property(
+                id: "TX-789012",
+                address: Address(street: "567 Congress Ave", city: "Austin", state: "TX", zip: "78701"),
+                price: 1250000,
+                propertyType: "Modern Condo",
+                bedrooms: 3,
+                bathrooms: 2,
+                squareFeet: 2100,
+                description: "Ultra-modern downtown condo with stunning city views and designer finishes.",
+                features: ["Floor-to-Ceiling Windows", "Private Terrace", "Concierge Service"],
+                photos: ["https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=1600&h=900"],
+                videoURL: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                status: "Active",
+                listingDate: Date(),
+                agent: Agent(name: "Michael Chen", brokerage: "Downtown Realty Group"),
+                likeCount: 0,
+                isFavorited: false
+            ),
+            Property(
+                id: "TX-345678",
+                address: Address(street: "890 Travis Heights Blvd", city: "Austin", state: "TX", zip: "78704"),
+                price: 1850000,
+                propertyType: "Contemporary Home",
+                bedrooms: 4,
+                bathrooms: 3,
+                squareFeet: 3200,
+                description: "Beautifully renovated home in Travis Heights featuring a chef's kitchen and a stunning backyard oasis.",
+                features: ["Chef's Kitchen", "Pool", "Covered Patio"],
+                photos: ["https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1600&h=900"],
+                videoURL: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                status: "Active",
+                listingDate: Date(),
+                agent: Agent(name: "Emily Rodriguez", brokerage: "Austin Elite Properties"),
                 likeCount: 0,
                 isFavorited: false
             )
         ]
     }
     
-    var currentProperty: Property? {
-        guard !properties.isEmpty else { return nil }
-        return properties[currentIndex]
-    }
-    
-    // Like functionality
     @MainActor
     func likeProperty() async {
-        guard let property = currentProperty else { return }
-        guard !isLiking else { return }
-        
-        // Debug log
-        print("Attempting to like property: \(property.id)")
-        
-        isLiking = true
-        defer { isLiking = false }
-        
+        guard let property = properties.first else { return }
         do {
-            // TODO: Get actual user ID from authentication
             let uid = "user123"
             let success = try await NetworkManager.shared.likeProperty(uid: uid, listingId: property.id)
-            
-            if success {
-                // Update local state
-                if let index = properties.firstIndex(where: { $0.id == property.id }) {
-                    properties[index].likeCount += 1
-                    // Debug log
-                    print("Successfully liked property. New like count: \(properties[index].likeCount)")
-                }
+            if success, let index = properties.firstIndex(where: { $0.id == property.id }) {
+                properties[index].likeCount += 1
+                print("Successfully liked property. New like count: \(properties[index].likeCount)")
             }
         } catch {
-            // Debug log
             print("Error liking property: \(error.localizedDescription)")
-            // TODO: Show error to user
         }
     }
     
-    // Favorite functionality
     @MainActor
     func toggleFavorite() async {
-        guard let property = currentProperty else { return }
-        guard !isFavoriting else { return }
-        
-        // Debug log
-        print("Attempting to toggle favorite for property: \(property.id)")
-        
-        isFavoriting = true
-        defer { isFavoriting = false }
-        
+        guard let property = properties.first else { return }
         do {
-            // TODO: Get actual user ID from authentication
             let uid = "user123"
             let success: Bool
-            
             if property.isFavorited {
                 success = try await NetworkManager.shared.unfavoriteProperty(uid: uid, listingId: property.id)
             } else {
                 success = try await NetworkManager.shared.favoriteProperty(uid: uid, listingId: property.id)
             }
-            
-            if success {
-                // Update local state
-                if let index = properties.firstIndex(where: { $0.id == property.id }) {
-                    properties[index].isFavorited.toggle()
-                    // Debug log
-                    print("Successfully \(properties[index].isFavorited ? "favorited" : "unfavorited") property")
-                }
+            if success, let index = properties.firstIndex(where: { $0.id == property.id }) {
+                properties[index].isFavorited.toggle()
+                print("Successfully \(properties[index].isFavorited ? "favorited" : "unfavorited") property")
             }
         } catch {
-            // Debug log
             print("Error toggling favorite: \(error.localizedDescription)")
-            // TODO: Show error to user
         }
     }
     
-    // Share functionality
     func getShareItems(for property: Property) -> [Any] {
-        // Debug log
         print("Preparing share items for property: \(property.id)")
-        
         var items: [Any] = []
-        
-        // Add property details
         let priceFormatter = NumberFormatter()
         priceFormatter.numberStyle = .currency
         priceFormatter.locale = Locale(identifier: "en_US")
-        
         let price = priceFormatter.string(from: NSNumber(value: property.price)) ?? "$\(property.price)"
         let description = """
         🏠 Check out this amazing property!
@@ -332,19 +316,14 @@ struct ShareSheet: UIViewControllerRepresentable {
         
         Powered by Real Tok AI
         """
-        
         items.append(description)
-        
-        // Add first photo if available
         if let url = URL(string: property.photos[0]) {
             items.append(url)
         }
-        
         return items
     }
     
     func toggleShareSheet() {
-        // Debug log
         print("Toggling share sheet. Current state: \(isShowingShareSheet)")
         isShowingShareSheet.toggle()
     }
@@ -360,23 +339,15 @@ struct ShareSheet: UIViewControllerRepresentable {
     @MainActor
     func loadFavorites() async {
         guard !isLoading else { return }
-        
-        // Debug log
         print("Loading favorites...")
-        
         isLoading = true
         defer { isLoading = false }
-        
         do {
-            // TODO: Get actual user ID from authentication
             let uid = "user123"
             favorites = try await NetworkManager.shared.getFavorites(uid: uid)
-            
-            // Debug log
             print("Successfully loaded \(favorites.count) favorites")
         } catch {
             self.error = error
-            // Debug log
             print("Error loading favorites: \(error.localizedDescription)")
         }
     }
@@ -384,28 +355,18 @@ struct ShareSheet: UIViewControllerRepresentable {
     @MainActor
     func unfavoriteProperty(_ property: Property) async {
         guard !isFavoriting else { return }
-        
-        // Debug log
         print("Attempting to unfavorite property: \(property.id)")
-        
         isFavoriting = true
         defer { isFavoriting = false }
-        
         do {
-            // TODO: Get actual user ID from authentication
             let uid = "user123"
             let success = try await NetworkManager.shared.unfavoriteProperty(uid: uid, listingId: property.id)
-            
             if success {
-                // Remove from local state
                 favorites.removeAll { $0.id == property.id }
-                // Debug log
                 print("Successfully unfavorited property and removed from list")
             }
         } catch {
-            // Debug log
             print("Error unfavoriting property: \(error.localizedDescription)")
-            // TODO: Show error to user
         }
     }
 }
@@ -438,7 +399,6 @@ struct FavoritesView: View {
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
                         Button("Try Again") {
-                            // Debug log
                             print("Retrying favorites load")
                             Task {
                                 await model.loadFavorites()
@@ -470,7 +430,6 @@ struct FavoritesView: View {
                         ) {
                             ForEach(model.favorites) { property in
                                 PropertyCard(property: property) {
-                                    // Debug log
                                     print("Unfavorite confirmed for property: \(property.id)")
                                     Task {
                                         await model.unfavoriteProperty(property)
@@ -495,7 +454,6 @@ struct FavoritesView: View {
             }
         }
         .onAppear {
-            // Debug log
             print("FavoritesView appeared")
             Task {
                 await model.loadFavorites()
@@ -546,7 +504,6 @@ struct PropertyCard: View {
                 
                 if onUnfavorite != nil {
                     Button {
-                        // Debug log
                         print("Unfavorite button tapped for property: \(property.id)")
                         showUnfavoriteConfirmation = true
                     } label: {
@@ -590,6 +547,110 @@ struct PropertyCard: View {
             }
         } message: {
             Text("This property will be removed from your favorites list.")
+        }
+    }
+}
+
+// MARK: - Video Feed View (TikTok‑Style)
+struct VideoFeedView: View {
+    @State private var selectedIndex: Int = 0
+    let model: PropertyViewModel
+    
+    init() {
+        self.model = PropertyViewModel()
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Vertical paging using rotation hack
+                TabView(selection: $selectedIndex) {
+                    ForEach(0..<model.properties.count, id: \.self) { index in
+                        // Swapping width and height for correct rotation
+                        VideoPlayerContainer(property: model.properties[index])
+                            .frame(width: geometry.size.height, height: geometry.size.width)
+                            .rotationEffect(.degrees(90))
+                            .tag(index)
+                    }
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .rotationEffect(.degrees(-90))
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                
+                // Overlay: Logo and property info/actions based on current property
+                if model.properties.indices.contains(selectedIndex) {
+                    let property = model.properties[selectedIndex]
+                    VStack {
+                        // Top section with logo
+                        HStack {
+                            Spacer()
+                            Text("Real Tok AI")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        Spacer()
+                        // Bottom section with property info and action buttons
+                        HStack(alignment: .bottom) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(property.address.street)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                Text("\(property.bedrooms) Bed | \(property.bathrooms) Bath | $\(Int(property.price))")
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            VStack(spacing: 20) {
+                                ActionButton(
+                                    icon: "heart.fill",
+                                    count: "\(property.likeCount)",
+                                    isActive: false
+                                ) {
+                                    Task {
+                                        await model.likeProperty()
+                                    }
+                                }
+                                ActionButton(
+                                    icon: "bookmark.fill",
+                                    count: "Save",
+                                    isActive: property.isFavorited
+                                ) {
+                                    Task {
+                                        await model.toggleFavorite()
+                                    }
+                                }
+                                ActionButton(
+                                    icon: "square.and.arrow.up",
+                                    count: "Share"
+                                ) {
+                                    print("Share button tapped")
+                                    model.toggleShareSheet()
+                                }
+                            }
+                            .padding(.trailing, 16)
+                            .padding(.bottom, 100)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .sheet(isPresented: .init(
+                get: { model.isShowingShareSheet },
+                set: { _ in model.toggleShareSheet() }
+            )) {
+                if model.properties.indices.contains(selectedIndex) {
+                    ShareSheet(items: model.getShareItems(for: model.properties[selectedIndex]))
+                }
+            }
+        }
+        .onAppear {
+            print("VideoFeedView appeared")
+            model.loadProperties()
         }
     }
 }
@@ -641,153 +702,6 @@ struct ContentView: View {
         }
         .accentColor(.white)
         .preferredColorScheme(.dark)
-    }
-}
-
-// MARK: - Video Feed View
-struct VideoFeedView: View {
-    @State private var isLiked = false
-    @State private var showPropertyDetails = false
-    let model: PropertyViewModel
-    
-    init() {
-        self.model = PropertyViewModel()
-    }
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Video Background with Gradient Overlay
-                Color.black.edgesIgnoringSafeArea(.all)
-                
-                if let property = model.currentProperty {
-                    // Property Content
-                    AsyncImage(url: URL(string: property.photos[0])) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .clipped()
-                                .overlay(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            .black.opacity(0.3),
-                                            .clear,
-                                            .black.opacity(0.7)
-                                        ]),
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .onTapGesture {
-                                    showPropertyDetails.toggle()
-                                }
-                        case .failure(let error):
-                            VStack {
-                                Color.black
-                                Text("Error: \(error.localizedDescription)")
-                                    .foregroundColor(.white)
-                            }
-                        case .empty:
-                            ProgressView()
-                                .scaleEffect(2.0)
-                                .tint(.white)
-                        @unknown default:
-                            Color.black
-                        }
-                    }
-                    .edgesIgnoringSafeArea(.all)
-                    
-                    // Content Overlays
-                    VStack(spacing: 0) {
-                        // Top Section with Logo
-                        HStack {
-                            Spacer()
-                            Text("Real Tok AI")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(.top, 0)
-                            Spacer()
-                        }
-                        
-                        Spacer()
-                        
-                        // Bottom Section
-                        HStack(alignment: .bottom, spacing: 0) {
-                            // Property Info
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("\(property.address.street)")
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-                                Text("\(property.bedrooms) Bed | \(property.bathrooms) Bath | $\(Int(property.price))")
-                                    .font(.subheadline)
-                                    .lineLimit(2)
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            // Action Buttons
-                            VStack(spacing: 20) {
-                                ActionButton(
-                                    icon: "heart.fill",
-                                    count: "\(property.likeCount)",
-                                    isActive: isLiked
-                                ) {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                        isLiked.toggle()
-                                        Task {
-                                            await model.likeProperty()
-                                        }
-                                    }
-                                }
-                                ActionButton(
-                                    icon: "bookmark.fill",
-                                    count: "Save",
-                                    isActive: property.isFavorited
-                                ) {
-                                    Task {
-                                        await model.toggleFavorite()
-                                    }
-                                }
-                                ActionButton(
-                                    icon: "square.and.arrow.up",
-                                    count: "Share"
-                                ) {
-                                    // Debug log
-                                    print("Share button tapped")
-                                    model.toggleShareSheet()
-                                }
-                            }
-                            .padding(.trailing, 16)
-                            .padding(.bottom, 100)
-                        }
-                    }
-                    
-                    // Property Details Overlay
-                    if showPropertyDetails {
-                        PropertyDetailsOverlay(property: property, isPresented: $showPropertyDetails)
-                            .transition(.opacity)
-                    }
-                }
-            }
-        }
-        .onAppear {
-            // Debug log
-            print("VideoFeedView appeared")
-            model.loadProperties()
-        }
-        .sheet(isPresented: .init(
-            get: { model.isShowingShareSheet },
-            set: { _ in model.toggleShareSheet() }
-        )) {
-            if let property = model.currentProperty {
-                ShareSheet(items: model.getShareItems(for: property))
-            }
-        }
     }
 }
 

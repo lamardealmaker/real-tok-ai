@@ -1,4 +1,21 @@
-# Phase 1 Implementation Plan
+# Real Tok AI - Phase 1 Implementation
+
+## Project Context
+We're building a TikTok-style real estate app that allows users to browse property listings through a vertical video feed interface. Currently, we have:
+
+- Firebase/Firestore setup complete
+- 10 test listings in the database with:
+  - High-quality property photos
+  - Detailed listing information
+  - Price ranges from $550K to $5.75M
+  - Various property types across Austin
+
+## Current Task
+Implementing the core video feed UI (TikTok-style interface). This is the foundation of our app's user experience and needs to:
+- Present listings in a full-screen, vertical scrolling format
+- Auto-play videos as users scroll
+- Display property information overlays
+- Handle Firestore data fetching and pagination
 
 ## 1. Create Main Video Feed UI (TikTok-style Interface)
 - [ ] Create `VideoFeedView` as main container
